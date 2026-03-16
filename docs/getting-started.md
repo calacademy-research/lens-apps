@@ -1,182 +1,218 @@
-# Getting Started with CAS Lens Components
+# Getting Started
 
-This guide walks you through building a small app that displays CAS specimen data using pre-built components. No knowledge of the CAS Lens internals is required.
+Build a small app that searches CAS specimens and shows detail pages — all within your own app, using your own layout.
 
-## What you get
+## What you need
 
-The `@calacademy-research/cas-lens` package gives you React components that connect to the CAS collections API. You can drop them into any React app to display:
+- Node.js 18+
+- Basic React knowledge (components, props, hooks)
 
-- **Specimen maps** — interactive vector tile maps with 1.4M+ specimens
-- **Search results** — sortable, paginated tables of specimen records
-- **Specimen detail pages** — full detail view with images, taxonomy, collector info, and maps
-
-## Prerequisites
-
-- Node.js 18+ and npm
-- Basic familiarity with React (components, props, JSX)
-- A GitHub account (for installing the package)
-
-## Step 1: Create a new React project
+## Step 1: Create a project
 
 ```bash
 npm create vite@latest my-cas-app -- --template react-ts
 cd my-cas-app
 ```
 
-## Step 2: Install the package
-
-The package is hosted on GitHub Packages. You need a GitHub personal access token with `read:packages` scope.
-
-Create a `.npmrc` file in your project root:
-
-```
-@calacademy-research:registry=https://npm.pkg.github.com
-//npm.pkg.github.com/:_authToken=${GITHUB_TOKEN}
-```
-
-Set the token in your environment:
+## Step 2: Install dependencies
 
 ```bash
-export GITHUB_TOKEN=ghp_your_token_here
-```
+# The CAS Lens package (from local build until published)
+npm install ../../cas-lens/frontend
 
-Install the package and its peer dependencies:
-
-```bash
-npm install @calacademy-research/cas-lens
+# Required peer dependencies
 npm install @tanstack/react-query react-router-dom
-npm install maplibre-gl @vis.gl/react-maplibre    # for maps
-npm install leaflet react-leaflet                  # for specimen detail
 ```
 
-> **Local development alternative:** If the package isn't published yet, install directly from the cas-lens repo:
-> ```bash
-> npm install ../../cas-lens/frontend
-> ```
+If you're building a map app, also install:
+```bash
+npm install maplibre-gl @vis.gl/react-maplibre
+```
 
-## Step 3: Write your app
+## Step 3: Set up the API proxy
 
-Replace `src/App.tsx` with:
+The CAS API is at `collections.calacademy.org`. To avoid CORS issues during development, add a proxy to `vite.config.ts`:
+
+```ts
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+
+export default defineConfig({
+  plugins: [react()],
+  server: {
+    proxy: {
+      '/api': {
+        target: 'https://collections.calacademy.org',
+        changeOrigin: true,
+      },
+      '/tiles': {
+        target: 'https://collections.calacademy.org',
+        changeOrigin: true,
+      },
+    },
+  },
+});
+```
+
+This lets your app call `/api/search` and have it forwarded to the production API.
+
+## Step 4: Write your app
+
+Replace `src/App.tsx`:
 
 ```tsx
 import { useState } from 'react';
-import { CASLensProvider, SpecimenSearch } from '@calacademy-research/cas-lens';
+import { useQuery } from '@tanstack/react-query';
+import { CASLensProvider, getApiClient } from '@calacademy-research/cas-lens';
 
-const API = 'https://collections.calacademy.org/api';
+// A simple specimen search that calls the API directly.
+// You control the rendering — there's no CAS Lens UI to work around.
 
-export default function App() {
+function Search() {
   const [query, setQuery] = useState('');
   const [submitted, setSubmitted] = useState('');
 
+  const { data, isLoading } = useQuery({
+    queryKey: ['search', submitted],
+    queryFn: async () => {
+      const client = getApiClient();
+      const res = await client.get('/search', {
+        params: { q: submitted, per_page: 10 },
+      });
+      return res.data;
+    },
+    enabled: submitted.length > 0,
+  });
+
   return (
-    <CASLensProvider apiBase={API}>
-      <div style={{ maxWidth: 900, margin: '0 auto', padding: 20 }}>
-        <h1>My Specimen Search</h1>
+    <div style={{ maxWidth: 800, margin: '0 auto', padding: 20 }}>
+      <h1>My Specimen Search</h1>
 
-        <form onSubmit={(e) => { e.preventDefault(); setSubmitted(query); }}>
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search specimens..."
-            style={{ padding: 8, width: 300, marginRight: 8 }}
-          />
-          <button type="submit" style={{ padding: '8px 16px' }}>Search</button>
-        </form>
+      <form onSubmit={(e) => { e.preventDefault(); setSubmitted(query); }}>
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search specimens..."
+          style={{ padding: 8, width: 300, marginRight: 8 }}
+        />
+        <button type="submit">Search</button>
+      </form>
 
-        {submitted && (
-          <SpecimenSearch query={submitted} perPage={20} />
-        )}
-      </div>
+      {isLoading && <p>Searching...</p>}
+
+      {data && (
+        <div>
+          <p>{data.total} results</p>
+          <ul>
+            {data.results.map((s: any) => (
+              <li key={s.id}>
+                <strong>{s.catalog_number}</strong> — <em>{s.scientific_name}</em>
+                {s.locality && ` — ${s.locality}`}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function App() {
+  return (
+    <CASLensProvider apiBase="/api">
+      <Search />
     </CASLensProvider>
   );
 }
 ```
 
-## Step 4: Run it
+## Step 5: Run it
 
 ```bash
 npm run dev
 ```
 
-Open http://localhost:5173 and search for "shark" or "Iris".
+Search for "iris" or "shark". Results come from the CAS API and render in your layout.
 
-That's it. You have a working specimen search app.
+## Next: add a local detail page
 
-## Adding a map
+The `search-tool` example in this repo shows the full pattern:
 
-To show specimens on a map instead of a table, swap `SpecimenSearch` for `SpecimenMap`:
+1. Add React Router routes
+2. Pass a `links` prop to `CASLensProvider` to redirect specimen links to your local route
+3. Build a detail page that fetches from `/api/specimens/{id}` and renders your way
 
-```tsx
-import { CASLensProvider, SpecimenMap } from '@calacademy-research/cas-lens';
-import 'maplibre-gl/dist/maplibre-gl.css';
-
-export default function App() {
-  return (
-    <CASLensProvider apiBase="https://collections.calacademy.org/api">
-      <SpecimenMap
-        collection="ich"
-        center={[-122.4, 37.8]}
-        zoom={5}
-        height="100vh"
-      />
-    </CASLensProvider>
-  );
-}
-```
-
-This renders a full-page map centered on San Francisco showing all Ichthyology specimens.
-
-## Showing a single specimen
-
-To display a detail page for a specific specimen:
+The key is the link override:
 
 ```tsx
-import { CASLensProvider, SpecimenDetailView } from '@calacademy-research/cas-lens';
-import 'leaflet/dist/leaflet.css';
-
-export default function App() {
-  return (
-    <CASLensProvider apiBase="https://collections.calacademy.org/api">
-      <SpecimenDetailView collection="ich" specimenId="246255" />
-    </CASLensProvider>
-  );
-}
-```
-
-## Key concepts
-
-### CASLensProvider
-
-Every CAS Lens component must be wrapped in `<CASLensProvider>`. This sets up the API connection and data caching. You only need one, typically at the top of your app.
-
-```tsx
-<CASLensProvider apiBase="https://collections.calacademy.org/api">
-  {/* your components here */}
+<CASLensProvider
+  apiBase="/api"
+  links={{
+    // Clicking a specimen anywhere in the app goes to YOUR route
+    specimen: (id, _collection) => `/specimen/${id}`,
+  }}
+>
+  <Routes>
+    <Route path="/" element={<SearchPage />} />
+    <Route path="/specimen/:id" element={<MyDetailPage />} />
+  </Routes>
 </CASLensProvider>
 ```
 
-The `apiBase` prop points to the CAS Lens API server.
-
-### Props, not configuration files
-
-All components are controlled via React props. There are no config files to write. Pass a `query` prop to search, a `collection` prop to filter — standard React patterns.
-
-### Data fetching is handled for you
-
-The components fetch data from the API automatically. You don't need to write fetch calls, manage loading states, or handle errors. The components do all of that internally.
-
-If you need custom data fetching (for example, to build your own UI), you can use the hooks directly:
+Inside `MyDetailPage`, fetch the specimen and render it however you want:
 
 ```tsx
-import { useSearchQuery, useSearchFilters } from '@calacademy-research/cas-lens';
+function MyDetailPage() {
+  const { id } = useParams();
+
+  const { data } = useQuery({
+    queryKey: ['specimen', id],
+    queryFn: async () => {
+      const client = getApiClient();
+      const res = await client.get(`/specimens/${id}`);
+      return res.data;
+    },
+  });
+
+  if (!data) return <p>Loading...</p>;
+
+  return (
+    <div>
+      <h1>{data.scientific_name}</h1>
+      <p>{data.locality}, {data.country}</p>
+    </div>
+  );
+}
 ```
 
-These hooks manage search state and can be used with or without a `SearchProvider`.
+See `search-tool/src/App.tsx` for the complete working version.
 
-## Working examples
+## Available API endpoints
 
-See the three example apps in this repo:
+These are the endpoints the example apps use. Call them via `getApiClient().get(path)`.
 
-- `map-explorer/` — map with search bar and collection dropdown
-- `search-tool/` — search form with results table and filtering
-- `specimen-viewer/` — detail page viewer with specimen ID lookup
+| Endpoint | Returns | Used by |
+|----------|---------|---------|
+| `/search?q=&per_page=` | Specimen search results | search-tool |
+| `/specimens/{uuid}` | Single specimen detail | specimen-viewer, search-tool |
+| `/stories?page=&per_page=` | Published stories | stories-browser |
+| `/stories?content_type=lesson_plan` | Lesson plans | lessons-browser |
+| `/literature?page=&per_page=&q=` | Literature/papers | papers-browser |
+| `/collections` | All collections | any app |
+
+## Available link builder types
+
+When you pass `links` to `CASLensProvider`, you can override URLs for these entity types:
+
+| Key | Signature | Default |
+|-----|-----------|---------|
+| `specimen` | `(id: string, collection: string) => string` | `https://collections.calacademy.org/{collection}/specimen/{id}` |
+| `story` | `(slug: string) => string` | `https://collections.calacademy.org/stories/{slug}` |
+| `lesson` | `(slug: string) => string` | `https://collections.calacademy.org/stories/{slug}` |
+| `literature` | `(slug: string) => string` | `https://collections.calacademy.org/literature/{slug}` |
+| `person` | `(slug: string) => string` | `https://collections.calacademy.org/people/{slug}` |
+| `expedition` | `(id: string) => string` | `https://collections.calacademy.org/expedition/{id}` |
+| `taxon` | `(id: string) => string` | `https://collections.calacademy.org/taxon/{id}` |
+| `collection` | `(code: string) => string` | `https://collections.calacademy.org/{code}` |
+
+Only override the ones you need. Unset types fall back to the CAS Lens production URLs.

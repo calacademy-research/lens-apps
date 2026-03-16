@@ -1,216 +1,164 @@
-# CAS Lens Module Reference
+# API Reference
 
-Complete reference for all components, hooks, and types exported by `@calacademy-research/cas-lens`.
+Everything exported by `@calacademy-research/cas-lens`.
 
 ---
 
-## Components
+## Provider
 
 ### CASLensProvider
 
-Top-level provider that configures the API connection and data caching. Must wrap all other CAS Lens components.
+Sets up the API connection, data caching, and link routing. Wrap your app in this.
 
 ```tsx
-<CASLensProvider apiBase="https://collections.calacademy.org/api">
+<CASLensProvider apiBase="/api" links={{ specimen: (id) => `/detail/${id}` }}>
   {children}
 </CASLensProvider>
 ```
 
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
-| `apiBase` | `string` | — | Base URL of the CAS Lens API |
-| `config` | `ApiClientConfig` | — | Additional API config (timeouts, credentials, debug) |
-| `queryClient` | `QueryClient` | internal | Custom React Query client, if your app already has one |
-
-If your app already uses `@tanstack/react-query`, pass your existing `QueryClient` to avoid duplicate providers:
-
-```tsx
-<CASLensProvider apiBase="/api" queryClient={myQueryClient}>
-```
+| `apiBase` | `string` | required | API base URL (use `/api` with a Vite proxy) |
+| `links` | `LinkBuilder` | CAS production URLs | Override entity link URLs (see below) |
+| `config` | `ApiClientConfig` | — | Timeout, credential, and debug overrides |
+| `queryClient` | `QueryClient` | internal | Your own React Query client, if you have one |
 
 ---
 
-### SpecimenMap
+## Link Builder
 
-Interactive vector tile map displaying CAS specimens with clustering. Supports 1.4M+ specimens with smooth interaction.
+### useLinkBuilder
 
-```tsx
-<SpecimenMap
-  query="Actinopterygii"
-  collection="ich"
-  center={[-122.4, 37.8]}
-  zoom={8}
-  height="600px"
-/>
-```
-
-| Prop | Type | Default | Description |
-|------|------|---------|-------------|
-| `query` | `string` | — | Search query to filter specimens |
-| `collection` | `string \| null` | `null` | Collection code (e.g., `'ich'`, `'botany'`). `null` = all |
-| `center` | `[number, number]` | `[20, 0]` | Initial map center `[lng, lat]` |
-| `zoom` | `number` | `2` | Initial zoom level |
-| `height` | `string` | `'100vh'` | CSS height for the map container |
-| `hasCoords` | `boolean` | `false` | Only show specimens with GPS coordinates |
-| `hasImages` | `boolean` | `false` | Only show specimens with images |
-| `excludedCollections` | `string[]` | `[]` | Collection codes to hide |
-| `taxonId` | `string` | — | Taxon UUID for hierarchical filtering |
-| `taxonName` | `string` | — | Display name for taxon filter |
-| `taxonRank` | `string` | — | Rank label (e.g., `'family'`) |
-| `onSpecimenClick` | `(id, collection) => void` | — | Callback when a specimen is clicked |
-| `className` | `string` | — | Additional CSS classes |
-
-**Requires:** `maplibre-gl` and `@vis.gl/react-maplibre` as peer dependencies. Import the MapLibre CSS in your app:
+Hook that returns link functions configured on the provider. Use it to generate entity URLs that stay within your app.
 
 ```tsx
-import 'maplibre-gl/dist/maplibre-gl.css';
+import { useLinkBuilder } from '@calacademy-research/cas-lens';
+
+function MyComponent() {
+  const links = useLinkBuilder();
+
+  // Returns "/detail/abc-123" if you configured specimen links,
+  // or "https://collections.calacademy.org/ich/specimen/abc-123" by default
+  const url = links.specimen('abc-123', 'ich');
+}
 ```
+
+### LinkBuilder interface
+
+```typescript
+interface LinkBuilder {
+  specimen?: (id: string, collection: string) => string;
+  story?: (slug: string) => string;
+  lesson?: (slug: string) => string;
+  literature?: (slug: string) => string;
+  person?: (slug: string) => string;
+  expedition?: (id: string) => string;
+  taxon?: (id: string) => string;
+  collection?: (code: string) => string;
+}
+```
+
+Only set the ones you need. Missing keys fall back to `https://collections.calacademy.org/...`.
 
 ---
 
-### SpecimenSearch
+## API Client
 
-Searchable, sortable, paginated table of specimen records. Handles data fetching internally.
+### configureApiClient
+
+Configure the API client before any calls (alternative to using CASLensProvider):
 
 ```tsx
-<SpecimenSearch
-  query="Iris"
-  collection="botany"
-  perPage={25}
-  onPageChange={(page) => console.log('Page:', page)}
-/>
+import { configureApiClient } from '@calacademy-research/cas-lens';
+
+configureApiClient({ baseURL: '/api', timeoutMs: 15000 });
 ```
 
-| Prop | Type | Default | Description |
-|------|------|---------|-------------|
-| `query` | `string` | — | Search query (required) |
-| `collection` | `string \| null` | `null` | Collection code filter |
-| `hasCoords` | `boolean` | `false` | Only show georeferenced specimens |
-| `hasImages` | `boolean` | `false` | Only show specimens with images |
-| `excludedCollections` | `string[]` | `[]` | Collection codes to exclude |
-| `page` | `number` | `1` | Current page |
-| `perPage` | `number` | `50` | Results per page |
-| `onPageChange` | `(page: number) => void` | — | Called when user navigates pages |
-| `onSpecimenClick` | `(specimen: Specimen) => void` | — | Called when a row is clicked |
-| `taxonId` | `string` | — | Taxon UUID filter |
-| `className` | `string` | — | Additional CSS classes |
+### getApiClient
 
----
-
-### SpecimenDetailView
-
-Full specimen detail page: images, map, taxonomy, collector links, editorial content, literature, and related stories.
+Get the axios instance for direct API calls:
 
 ```tsx
-<SpecimenDetailView collection="ich" specimenId="246255" />
+import { getApiClient } from '@calacademy-research/cas-lens';
+
+const client = getApiClient();
+const { data } = await client.get('/search', { params: { q: 'iris' } });
 ```
 
-| Prop | Type | Default | Description |
-|------|------|---------|-------------|
-| `collection` | `string` | — | Collection code (required) |
-| `specimenId` | `string` | — | Specimen ID (required) |
-| `className` | `string` | — | Additional CSS classes |
+### getApiConfig
 
-**Requires:** `leaflet` and `react-leaflet` as peer dependencies. Import the Leaflet CSS:
+Read current configuration:
 
 ```tsx
-import 'leaflet/dist/leaflet.css';
+import { getApiConfig } from '@calacademy-research/cas-lens';
+
+const config = getApiConfig();
+// config.baseURL, config.timeoutMs, etc.
+```
+
+### ApiClientConfig
+
+```typescript
+interface ApiClientConfig {
+  baseURL?: string;           // default: '/api'
+  timeoutMs?: number;         // default: 30000
+  searchTimeoutMs?: number;   // default: 15000
+  externalTimeoutMs?: number; // default: 60000
+  withCredentials?: boolean;  // default: true
+  debug?: boolean;            // default: true in dev
+}
 ```
 
 ---
 
 ## Hooks
 
-These hooks can be used to build custom UI. Each works in two modes:
-- **Inside SearchProvider:** delegates to the shared context
-- **Standalone:** manages its own local state
+State management hooks that work standalone or inside the CAS Lens SearchProvider. For most external apps, use them standalone.
 
 ### useSearchQuery
 
-Search query and mode state.
+Search mode, query text, and submit state.
 
 ```tsx
 const {
-  mode,            // 'express' | 'advanced' | 'allfields'
-  setMode,
-  query,           // current input text
-  setQuery,
-  submittedQuery,  // last submitted query
-  submitQuery,     // (query: string) => void
-  effectiveQuery,  // computed query string for API calls
-  hasActiveSearch,  // boolean — is there an active search?
+  query, setQuery,
+  submittedQuery,
+  submitQuery,          // (q: string) => void
+  effectiveQuery,       // computed query for API calls
+  hasActiveSearch,      // boolean
+  mode, setMode,        // 'express' | 'advanced' | 'allfields'
   advancedConditions,
   advancedMatchMode,
-  advancedSubmitted,
   submitAdvancedSearch,
 } = useSearchQuery({ initialQuery: 'shark' });
 ```
 
-| Prop | Type | Default | Description |
-|------|------|---------|-------------|
-| `initialQuery` | `string` | `''` | Pre-populated query |
-| `initialMode` | `SearchMode` | `'express'` | Initial search mode |
-
----
-
 ### useSearchFilters
 
-All specimen filter state: collections, IUCN categories, type statuses, entity filters.
+All filter state: collections, IUCN, type status, entity filters.
 
 ```tsx
 const {
   hasCoords, setHasCoords,
   hasImages, setHasImages,
-  excludedCollections, toggleExcludedCollection, setExcludedCollections, clearExcludedCollections,
-  iucnCategories, setIucnCategories, clearIucnCategories,
-  nsImperiled, setNsImperiled,
-  typeStatuses, setTypeStatuses, clearTypeStatuses,
-  taxonFilter, setTaxonFilter, clearTaxonFilter,
-  expeditionFilter, setExpeditionFilter, clearExpeditionFilter,
-  listFilter, setListFilter, clearListFilter,
-  speciesFilter, setSpeciesFilter, clearSpeciesFilter,
-  // boolean flags
-  hasExcludedCollections, hasExpeditionFilter, hasListFilter,
-  hasSpeciesFilter, hasTaxonFilter,
-  // debounced version for API calls (300ms delay)
-  debouncedExcludedCollections,
-} = useSearchFilters({ excludedCollections: ['geo'] });
+  excludedCollections, toggleExcludedCollection,
+  iucnCategories, setIucnCategories,
+  taxonFilter, setTaxonFilter,
+  // ... and more
+} = useSearchFilters();
 ```
-
-| Prop | Type | Default | Description |
-|------|------|---------|-------------|
-| `excludedCollections` | `string[]` | `[]` | Initial exclusions |
-| `iucnCategories` | `string[]` | `[]` | Initial IUCN filter |
-| `typeStatuses` | `string[]` | `[]` | Initial type status filter |
-| `taxonFilter` | `TaxonFilter \| null` | `null` | Initial taxon filter |
-
----
 
 ### useMapState
 
-Map viewport and bounding box state.
+Map viewport and bounding box.
 
 ```tsx
 const {
-  mapView,          // { center: [lng, lat], zoom, mapLayer? }
-  setMapView,
-  resetMapView,
-  boundingBox,      // BoundingBox | null
-  setBoundingBox,
-  clearBoundingBox,
+  mapView, setMapView, resetMapView,
+  boundingBox, setBoundingBox, clearBoundingBox,
   hasBoundingBox,
-  viewportFromShareLink,
-  clearViewportFromShareLink,
 } = useMapState({ center: [-122.4, 37.8], zoom: 10 });
 ```
-
-| Prop | Type | Default | Description |
-|------|------|---------|-------------|
-| `center` | `[number, number]` | `[20, 0]` | Initial center `[lng, lat]` |
-| `zoom` | `number` | `2` | Initial zoom |
-| `mapLayer` | `'street' \| 'satellite'` | `'street'` | Base layer |
-
----
 
 ### usePaginationState
 
@@ -218,59 +166,53 @@ Page and sort state.
 
 ```tsx
 const {
-  page,         // current page number
-  setPage,
-  sortField,    // column name or null
-  sortOrder,    // 'asc' | 'desc'
-  setSortField, // (field, order) => void — also resets page to 1
-} = usePaginationState({ initialPage: 1 });
+  page, setPage,
+  sortField, sortOrder, setSortField,
+} = usePaginationState();
 ```
-
-| Prop | Type | Default | Description |
-|------|------|---------|-------------|
-| `initialPage` | `number` | `1` | Starting page |
-| `initialSortField` | `string \| null` | `null` | Default sort column |
-| `initialSortOrder` | `'asc' \| 'desc'` | `'asc'` | Default sort direction |
 
 ---
 
-## API Configuration
+## API Endpoints
 
-### configureApiClient
+These are the CAS Lens API endpoints used by the example apps. Call them via `getApiClient().get(path, { params })`.
 
-Configure the API client programmatically (alternative to `CASLensProvider`):
+### Specimens
 
-```tsx
-import { configureApiClient } from '@calacademy-research/cas-lens';
+| Endpoint | Method | Params | Returns |
+|----------|--------|--------|---------|
+| `/search` | GET | `q`, `collection`, `page`, `per_page`, `sort_by`, `has_images`, `has_coords`, `taxon_id` | `{ results: Specimen[], total, page, per_page, total_pages }` |
+| `/specimens/{uuid}` | GET | — | `Specimen` |
 
-configureApiClient({
-  baseURL: 'https://collections.calacademy.org/api',
-  timeoutMs: 30000,
-  withCredentials: false,
-});
-```
+### Stories
 
-### getApiClient
+| Endpoint | Method | Params | Returns |
+|----------|--------|--------|---------|
+| `/stories` | GET | `page`, `per_page`, `content_type` | `{ stories: Story[], total, page, per_page }` |
 
-Get the underlying axios instance for custom API calls:
+Use `content_type=lesson_plan` to get only lesson plans.
 
-```tsx
-import { getApiClient } from '@calacademy-research/cas-lens';
+### Literature
 
-const client = getApiClient();
-const response = await client.get('/collections');
-```
+| Endpoint | Method | Params | Returns |
+|----------|--------|--------|---------|
+| `/literature` | GET | `page`, `per_page`, `q` | `{ items: Paper[], total, page, per_page, total_pages }` |
 
-### getApiConfig
+Note: literature returns `items`, not `results`.
 
-Read the current resolved configuration:
+### Collections
 
-```tsx
-import { getApiConfig } from '@calacademy-research/cas-lens';
+| Endpoint | Method | Returns |
+|----------|--------|---------|
+| `/collections` | GET | `Collection[]` |
 
-const config = getApiConfig();
-console.log(config.baseURL, config.timeoutMs);
-```
+### Vector Tiles
+
+| Endpoint | Returns |
+|----------|---------|
+| `/tiles/{collection}/{z}/{x}/{y}.pbf` | Protobuf vector tile |
+
+Use `all` as the collection for all specimens.
 
 ---
 
@@ -278,21 +220,20 @@ console.log(config.baseURL, config.timeoutMs);
 
 ### Specimen
 
-Core specimen record.
-
 ```typescript
 interface Specimen {
-  id: string;
+  id: string;                          // UUID
   catalog_number: string;
-  collection_code: string;
+  collection_code: string;             // 'ich', 'botany', etc.
   scientific_name: string | null;
   accepted_name: string | null;
+  common_name: string | null;
   taxon_class: string | null;
   taxon_order: string | null;
   taxon_family: string | null;
   taxon_genus: string | null;
   taxon_species: string | null;
-  type_status: string | null;
+  type_status: string | null;          // 'Holotype', 'Paratype', etc.
   locality: string | null;
   country: string | null;
   state_province: string | null;
@@ -300,34 +241,19 @@ interface Specimen {
   longitude: number | null;
   verbatim_collector: string | null;
   year_collected: number | null;
+  determined_by: string | null;
+  iucn_category: string | null;        // 'CR', 'EN', 'VU', etc.
   media: MediaItem[];
-  // ... and many more fields
 }
 ```
 
-### Collection
+### MediaItem
 
 ```typescript
-interface Collection {
-  id: string;
-  code: string;
-  name: string;
-  specimen_count: number;
-}
-```
-
-### SearchResponse
-
-```typescript
-interface SearchResponse {
-  query: string;
-  total: number;
-  page: number;
-  per_page: number;
-  total_pages: number;
-  results: Specimen[];
-  facets: SearchFacets | null;
-  search_time_ms: number;
+interface MediaItem {
+  url: string;
+  type: 'image' | '3d_model';
+  label?: string;
 }
 ```
 
@@ -357,27 +283,14 @@ interface MapViewState {
 ```typescript
 interface TaxonFilter {
   taxon_id: string;   // UUID
-  name: string;       // e.g., "Formicidae"
-  rank: string;       // e.g., "family"
-}
-```
-
-### ApiClientConfig
-
-```typescript
-interface ApiClientConfig {
-  baseURL?: string;
-  timeoutMs?: number;          // default: 30000
-  searchTimeoutMs?: number;    // default: 15000
-  externalTimeoutMs?: number;  // default: 60000
-  withCredentials?: boolean;   // default: true
-  debug?: boolean;             // default: true in dev
+  name: string;       // display name
+  rank: string;       // 'family', 'order', etc.
 }
 ```
 
 ---
 
-## Collection codes
+## Collection Codes
 
 | Code | Collection |
 |------|------------|
@@ -391,22 +304,3 @@ interface ApiClientConfig {
 | `geo` | Geology |
 | `anthro` | Anthropology |
 | `antweb` | AntWeb |
-
----
-
-## Peer dependencies
-
-These must be installed by the consuming app:
-
-| Package | Version | Required for |
-|---------|---------|-------------|
-| `react` | ^18 | All components |
-| `react-dom` | ^18 | All components |
-| `react-router-dom` | ^6 | SpecimenMap, SpecimenDetailView |
-| `@tanstack/react-query` | ^5 | All components (data caching) |
-| `maplibre-gl` | ^5 | SpecimenMap |
-| `@vis.gl/react-maplibre` | ^8 | SpecimenMap |
-| `leaflet` | ^1.9 | SpecimenDetailView |
-| `react-leaflet` | ^4 | SpecimenDetailView |
-
-If you only use `SpecimenSearch`, you only need react, react-dom, and @tanstack/react-query.
