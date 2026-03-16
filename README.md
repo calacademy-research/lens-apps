@@ -4,43 +4,23 @@ Example apps built on top of [CAS Lens](https://github.com/calacademy-research/c
 
 ## Why this exists
 
-Different teams at CAS need different things from the collections data. The education team might want a lesson plan finder. A researcher might want a specialized map for a single taxon. IT might want a dashboard. Each team could build their tool from scratch — export some data, put it in their own database, write their own search. But that creates problems:
+Different teams at CAS need different things from the collections data. The education team might want a lesson plan finder. A researcher might want a specialized map for a single taxon. IT might want a dashboard. Each team could build their tool from scratch — export some data, stand up a database, write their own search. But that creates data islands. A specimen record gets corrected in the main database, but the lesson plan finder still shows the old name. A new paper is published, but the dashboard doesn't know about it. Every tool reimplements search, pagination, taxonomy lookups, and geographic filtering. Bugs get fixed in one place but not the others.
 
-- **Data islands.** Each tool has its own copy of the data, updated on its own schedule (or not at all). A specimen record gets corrected in the main database, but the lesson plan finder still shows the old name. A new paper is published, but the researcher's dashboard doesn't know about it.
-
-- **Duplicated effort.** Every tool reimplements search, pagination, taxonomy lookups, geographic filtering. Bugs get fixed in one place but not the others. Improvements don't propagate.
-
-- **Maintenance burden.** Each tool is a full application with its own data pipeline, its own deployment, its own bugs. When the main database schema changes, everything breaks independently.
-
-These apps take a different approach: **call the live CAS Lens API at query time.** No data copies, no sync jobs, no separate databases. Your app is 80-250 lines of code that fetches current data and renders it your way. When a specimen record is updated, a story is published, or a paper is added, every app that uses the API reflects it immediately.
+CAS Lens has already solved these problems — search across 1.4 million specimens, map rendering with GPU-accelerated clustering, filter state management, taxonomy resolution, IUCN enrichment, collector matching, and more. Instead of making every new tool re-solve them, we export the solutions as reusable pieces. Your app plugs into CAS Lens and gets working functionality, not just raw data. The data stays in one place, always current, and the hard engineering work doesn't get repeated.
 
 ## What you can use
 
-A typical approach would be to publish an API and tell people "here are the endpoints, go build something." That's not enough. An API gives you raw data, but the hard problems are everything that sits between data and a working app: How do you manage search state across multiple views? How do you render 1.4 million specimens on a map without the browser crashing? How do you keep filters, pagination, and URL state in sync? How do you handle debounced collection toggles, or bounding box intersection with antimeridian wrapping?
+The API is available (call `getApiClient()`, get JSON), but what matters more is the functionality you can pull in without rebuilding it:
 
-CAS Lens has already solved these problems. Instead of making every consumer re-solve them, we export the solutions as reusable pieces — not just data endpoints, but working code that handles the complexity.
+**State management.** The hooks `useSearchQuery`, `useSearchFilters`, `useMapState`, and `usePaginationState` are the same ones the main app uses. They handle the details that are easy to get wrong — debouncing collection toggles so the API isn't flooded, resetting the page when filters change, computing an effective query from structured conditions. You get that behavior and render your own UI on top.
 
-Here's what's available, from simplest to most involved:
+**Vector tiles.** The CAS tile server renders 1.4M+ specimens on a map with pre-clustered tiles at per-zoom-level cluster distances. The `map-explorer` app uses this in about 200 lines — the same map performance as the main app without reimplementing the tiling, clustering, or collection-color logic.
 
-### Level 1: Data
-
-Call the API with `getApiClient()`, get JSON back, render it yourself. The `papers-browser` and `stories-browser` apps work this way. You get the same data as the main CAS Lens app — specimens with resolved taxonomy, IUCN status, collector links, and media — without running your own database or indexing pipeline.
-
-### Level 2: Data + state management
-
-Use the hooks (`useSearchQuery`, `useSearchFilters`, `useMapState`, `usePaginationState`) to manage search, filter, and pagination state. These are the same hooks the main app uses internally. They handle the details — debouncing collection toggles so the API isn't flooded, resetting the page number when filters change, computing an effective query from structured conditions. You get that behavior for free and just render your own UI on top.
-
-### Level 3: Data + vector tiles
-
-Use the CAS tile server directly with MapLibre GL to render 1.4M+ specimens on a map. The tiles are pre-clustered with per-zoom-level cluster distances, meaning the world view shows hundreds of clusters, not 20 mega-blobs. The `map-explorer` app does this in about 200 lines — getting the same map performance as the main app without reimplementing the tiling, clustering, or collection-color logic.
-
-### Level 4: Data + link routing
-
-Use the link builder to keep navigation within your app. When a user clicks a specimen, story, or paper, the link points to your page, not `collections.calacademy.org`. The `search-tool` demonstrates this with a local specimen detail page — one prop on the provider, and every generated link routes through your app.
+**Link routing.** The link builder keeps navigation within your app. When a user clicks a specimen, story, or paper, the link points to your page, not `collections.calacademy.org`. One prop on the provider, and every generated link routes through your app. The `search-tool` demonstrates this with a local specimen detail page.
 
 You choose how much to take. Each example app shows a different point on that spectrum.
 
-If you can write Python, you can read this code — the concepts are the same (fetch data from an API, render it), just in JavaScript/TypeScript instead.
+If you can write Python, you can read this code — the concepts are the same (fetch data, render it), just in JavaScript/TypeScript.
 
 ## What these apps look like
 
