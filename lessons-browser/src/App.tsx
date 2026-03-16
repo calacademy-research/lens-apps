@@ -6,7 +6,7 @@
  */
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { CASLensProvider, getApiClient } from '@calacademy-research/cas-lens';
+import { CASLensProvider, getApiClient, useLinkBuilder } from '@calacademy-research/cas-lens';
 
 interface LessonPlan {
   id: number;
@@ -28,6 +28,7 @@ interface LessonsResponse {
 }
 
 function LessonsGrid() {
+  const links = useLinkBuilder();
   const [page, setPage] = useState(1);
 
   const { data, isLoading, error } = useQuery<LessonsResponse>({
@@ -79,7 +80,7 @@ function LessonsGrid() {
         {lessons.map((lesson) => (
           <a
             key={lesson.id}
-            href={`https://collections.calacademy.org/stories/${lesson.slug}`}
+            href={links.lesson(lesson.slug)}
             target="_blank"
             rel="noopener noreferrer"
             style={{
@@ -170,6 +171,8 @@ function LessonsGrid() {
 
 export default function App() {
   return (
+    // To override links in your own app, pass a `links` prop:
+    // <CASLensProvider apiBase="/api" links={{ lesson: (slug) => `/lessons/${slug}` }}>
     <CASLensProvider apiBase="/api">
       <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '20px', fontFamily: 'system-ui' }}>
         <h1 style={{ color: '#003262', marginBottom: '4px' }}>CAS Lesson Plans</h1>

@@ -6,7 +6,7 @@
  */
 import { useState, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { CASLensProvider, getApiClient } from '@calacademy-research/cas-lens';
+import { CASLensProvider, getApiClient, useLinkBuilder } from '@calacademy-research/cas-lens';
 
 interface Specimen {
   id: string;
@@ -30,6 +30,7 @@ interface SearchResponse {
 }
 
 function SearchInner() {
+  const links = useLinkBuilder();
   const [query, setQuery] = useState('');
   const [submittedQuery, setSubmittedQuery] = useState('');
   const [collection, setCollection] = useState<string | null>(null);
@@ -165,7 +166,7 @@ function SearchInner() {
                       onMouseLeave={(e) => (e.currentTarget.style.background = 'white')}
                     >
                       <td style={tdStyle}>
-                        <a href={`https://collections.calacademy.org/${s.collection_code}/specimen/${s.id}`}
+                        <a href={links.specimen(s.id, s.collection_code)}
                           target="_blank" rel="noopener noreferrer"
                           style={{ color: '#003262', textDecoration: 'none', fontWeight: 500 }}>
                           {s.catalog_number}
@@ -220,6 +221,8 @@ function SearchInner() {
 
 export default function App() {
   return (
+    // To override links in your own app, pass a `links` prop:
+    // <CASLensProvider apiBase="/api" links={{ specimen: (id, col) => `/specimen/${col}/${id}` }}>
     <CASLensProvider apiBase="/api">
       <SearchInner />
     </CASLensProvider>

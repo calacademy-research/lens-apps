@@ -6,7 +6,7 @@
  */
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { CASLensProvider, getApiClient } from '@calacademy-research/cas-lens';
+import { CASLensProvider, getApiClient, useLinkBuilder } from '@calacademy-research/cas-lens';
 
 const API_BASE = '/api';
 
@@ -50,6 +50,7 @@ const EXAMPLES = [
 ];
 
 function SpecimenDetail({ specimenId }: { specimenId: string }) {
+  const links = useLinkBuilder();
   const { data: specimen, isLoading, error } = useQuery<Specimen>({
     queryKey: ['specimen', specimenId],
     queryFn: async () => {
@@ -149,7 +150,7 @@ function SpecimenDetail({ specimenId }: { specimenId: string }) {
       {/* Link to full detail on CAS Lens */}
       <div style={{ marginTop: '24px', textAlign: 'center' }}>
         <a
-          href={`https://collections.calacademy.org/${specimen.collection_code}/specimen/${specimen.id}`}
+          href={links.specimen(specimen.id, specimen.collection_code)}
           target="_blank"
           rel="noopener noreferrer"
           style={{ color: '#003262', fontSize: '14px' }}
@@ -172,6 +173,8 @@ export default function App() {
   };
 
   return (
+    // To override links in your own app, pass a `links` prop:
+    // <CASLensProvider apiBase={API_BASE} links={{ specimen: (id, col) => `/detail/${col}/${id}` }}>
     <CASLensProvider apiBase={API_BASE}>
       <div style={{ fontFamily: 'system-ui' }}>
         <header style={{

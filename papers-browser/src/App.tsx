@@ -181,6 +181,9 @@ function PapersList() {
 
 export default function App() {
   return (
+    // To override links in your own app, pass a `links` prop:
+    // <CASLensProvider apiBase="/api" links={{ literature: (slug) => `/papers/${slug}` }}>
+    // Note: DOI links are external and are not affected by the link builder.
     <CASLensProvider apiBase="/api">
       <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '20px', fontFamily: 'system-ui' }}>
         <h1 style={{ color: '#003262', marginBottom: '4px' }}>CAS Papers</h1>

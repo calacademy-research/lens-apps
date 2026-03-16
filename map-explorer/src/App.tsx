@@ -10,7 +10,7 @@ import { Map, Source, Layer, NavigationControl, ScaleControl, Popup } from '@vis
 import type { MapRef, MapMouseEvent } from '@vis.gl/react-maplibre';
 import type { MapGeoJSONFeature } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { CASLensProvider, configureApiClient } from '@calacademy-research/cas-lens';
+import { CASLensProvider, configureApiClient, useLinkBuilder } from '@calacademy-research/cas-lens';
 
 configureApiClient({ baseURL: '/api' });
 
@@ -46,9 +46,35 @@ const COLLECTION_COLOR_EXPR: any = [
 interface PopupInfo {
   lng: number;
   lat: number;
+  id: string;
   name: string;
   collection: string;
   catalogNumber: string;
+}
+
+/** Popup content that uses the link builder for specimen links */
+function PopupContent({ info }: { info: PopupInfo }) {
+  const links = useLinkBuilder();
+  return (
+    <div style={{ fontSize: '13px' }}>
+      <strong>{info.name}</strong>
+      <br />
+      <span style={{ color: '#666' }}>{info.collection.toUpperCase()} {info.catalogNumber}</span>
+      {info.id && (
+        <>
+          <br />
+          <a
+            href={links.specimen(info.id, info.collection)}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: '#003262', fontSize: '12px' }}
+          >
+            View specimen details
+          </a>
+        </>
+      )}
+    </div>
+  );
 }
 
 export default function App() {
@@ -78,6 +104,7 @@ export default function App() {
     setPopupInfo({
       lng: e.lngLat.lng,
       lat: e.lngLat.lat,
+      id: props.id || '',
       name: props.scientific_name || props.name || 'Unknown',
       collection: props.collection_code || '',
       catalogNumber: props.catalog_number || '',
@@ -85,6 +112,8 @@ export default function App() {
   }, []);
 
   return (
+    // To override links in your own app, pass a `links` prop:
+    // <CASLensProvider apiBase="/api" links={{ specimen: (id, col) => `/specimen/${col}/${id}` }}>
     <CASLensProvider apiBase="/api">
       <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
         {/* Header */}
@@ -197,11 +226,7 @@ export default function App() {
                 closeButton={true}
                 onClose={() => setPopupInfo(null)}
               >
-                <div style={{ fontSize: '13px' }}>
-                  <strong>{popupInfo.name}</strong>
-                  <br />
-                  <span style={{ color: '#666' }}>{popupInfo.collection.toUpperCase()} {popupInfo.catalogNumber}</span>
-                </div>
+                <PopupContent info={popupInfo} />
               </Popup>
             )}
           </Map>
