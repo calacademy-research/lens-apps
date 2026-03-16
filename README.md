@@ -4,23 +4,19 @@ Example apps built on top of [CAS Lens](https://github.com/calacademy-research/c
 
 ## Why this exists
 
-Different teams at CAS need different things from the collections data. The education team might want a lesson plan finder. A researcher might want a specialized map for a single taxon. IT might want a dashboard. Each team could build their tool from scratch — export some data, stand up a database, write their own search. But that creates data islands. A specimen record gets corrected in the main database, but the lesson plan finder still shows the old name. A new paper is published, but the dashboard doesn't know about it. Every tool reimplements search, pagination, taxonomy lookups, and geographic filtering. Bugs get fixed in one place but not the others.
+CAS Lens covers specimens, maps, stories, lesson plans, literature, expeditions, and more. Different groups at the institution will want to build focused tools around parts of that — a lesson plan finder for educators, a taxon-specific map for a research project, a dashboard for a department. These tools will have their own way of presenting the data, and they'll often need to layer on information that doesn't belong in CAS Lens itself because it doesn't fit the general-purpose model.
 
-CAS Lens has already solved these problems — search across 1.4 million specimens, map rendering with GPU-accelerated clustering, filter state management, taxonomy resolution, IUCN enrichment, collector matching, and more. Instead of making every new tool re-solve them, we export the solutions as reusable pieces. Your app plugs into CAS Lens and gets working functionality, not just raw data. The data stays in one place, always current, and the hard engineering work doesn't get repeated.
+The API takes care of data islands — everything reads from the same live source, so there's nothing to sync. But data alone isn't that useful. The harder work is search state management, map rendering at scale, filter logic, pagination, URL routing. CAS Lens already has working code for all of that. This package lets you pull in as much or as little of it as you need.
 
 ## What you can use
 
-The API is available (call `getApiClient()`, get JSON), but what matters more is the functionality you can pull in without rebuilding it:
+**State management.** The hooks `useSearchQuery`, `useSearchFilters`, `useMapState`, and `usePaginationState` handle search, filtering, and pagination state. They deal with debouncing, page resets on filter changes, and query construction from structured conditions.
 
-**State management.** The hooks `useSearchQuery`, `useSearchFilters`, `useMapState`, and `usePaginationState` are the same ones the main app uses. They handle the details that are easy to get wrong — debouncing collection toggles so the API isn't flooded, resetting the page when filters change, computing an effective query from structured conditions. You get that behavior and render your own UI on top.
+**Vector tiles.** The CAS tile server serves pre-clustered tiles for 1.4M+ specimens. The `map-explorer` app renders them with MapLibre GL in about 200 lines.
 
-**Vector tiles.** The CAS tile server renders 1.4M+ specimens on a map with pre-clustered tiles at per-zoom-level cluster distances. The `map-explorer` app uses this in about 200 lines — the same map performance as the main app without reimplementing the tiling, clustering, or collection-color logic.
+**Link routing.** The link builder lets you redirect entity links (specimens, stories, papers) to pages in your app instead of `collections.calacademy.org`. The `search-tool` shows this with a local specimen detail page.
 
-**Link routing.** The link builder keeps navigation within your app. When a user clicks a specimen, story, or paper, the link points to your page, not `collections.calacademy.org`. One prop on the provider, and every generated link routes through your app. The `search-tool` demonstrates this with a local specimen detail page.
-
-You choose how much to take. Each example app shows a different point on that spectrum.
-
-If you can write Python, you can read this code — the concepts are the same (fetch data, render it), just in JavaScript/TypeScript.
+Each example app uses a different combination. If you can write Python, you can read this code — same concepts, different language.
 
 ## What these apps look like
 
