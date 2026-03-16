@@ -138,7 +138,8 @@ export default function App() {
             <ScaleControl position="bottom-left" />
 
             <Source
-              id="specimens"
+              key={`specimens-${collection}`}
+              id={`specimens-${collection}`}
               type="vector"
               tiles={[`${window.location.origin}${tilesUrl}`]}
               minzoom={0}
