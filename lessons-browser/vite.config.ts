@@ -4,7 +4,7 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   plugins: [react()],
   server: {
-    port: 5181,
+    port: 5184,
     proxy: {
       '/api': {
         target: 'https://collections.calacademy.org',

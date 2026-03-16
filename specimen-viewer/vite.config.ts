@@ -3,4 +3,21 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
+  server: {
+    port: 5182,
+    proxy: {
+      '/api': {
+        target: 'https://collections.calacademy.org',
+        changeOrigin: true,
+      },
+      '/tiles': {
+        target: 'https://collections.calacademy.org',
+        changeOrigin: true,
+      },
+      '/static': {
+        target: 'https://collections.calacademy.org',
+        changeOrigin: true,
+      },
+    },
+  },
 });

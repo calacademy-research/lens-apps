@@ -12,20 +12,20 @@ import { useState } from 'react';
 import { CASLensProvider, SpecimenDetailView } from '@calacademy-research/cas-lens';
 import 'leaflet/dist/leaflet.css';
 
-const API_BASE = 'https://collections.calacademy.org/api';
+const API_BASE = '/api';
 
-// A few interesting specimens to browse
+// Specimen UUIDs — the API uses UUIDs, not catalog numbers
 const EXAMPLES = [
-  { collection: 'ich', id: '246255', label: 'CAS-ICH 246255 — Coelacanth' },
-  { collection: 'herp', id: '1234', label: 'CAS-HERP 1234' },
-  { collection: 'ent', id: '100', label: 'CASENT 100' },
-  { collection: 'botany', id: '500', label: 'CAS-BOT 500' },
+  { collection: 'ich', id: '367565b1-257d-11ed-aace-005056be1b7a', label: 'Coelacanth (ICH 210288)' },
+  { collection: 'ich', id: '348b88d1-257d-11ed-aace-005056be1b7a', label: 'Shark (ICH 53961)' },
+  { collection: 'herp', id: '38b73cc3-257d-11ed-aace-005056be1b7a', label: 'HERP 100030' },
+  { collection: 'botany', id: '3d38f1e9-257d-11ed-aace-005056be1b7a', label: 'BOT 100010' },
 ];
 
 export default function App() {
   const [collection, setCollection] = useState('ich');
-  const [specimenId, setSpecimenId] = useState('246255');
-  const [viewing, setViewing] = useState({ collection: 'ich', id: '246255' });
+  const [specimenId, setSpecimenId] = useState('367565b1-257d-11ed-aace-005056be1b7a');
+  const [viewing, setViewing] = useState({ collection: 'ich', id: '367565b1-257d-11ed-aace-005056be1b7a' });
 
   const handleView = (e: React.FormEvent) => {
     e.preventDefault();
