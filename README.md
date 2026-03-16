@@ -1,75 +1,201 @@
-# CAS Lens Example Apps
+# Lens Apps
 
-Six example apps showing how to use CAS collections data in your own React projects.
+Example apps that use data from the California Academy of Sciences specimen database. Each one is a small, self-contained web app that pulls data from the CAS API and displays it in its own way.
 
-Each app is a standalone Vite + React project in its own directory. They pull data from the CAS Lens API and render it independently — no knowledge of the CAS Lens codebase is needed.
+These apps exist to show how you can build your own tools on top of CAS collections data. If you can write Python, you can read this code — the concepts are the same (fetch data from an API, render it), just in JavaScript/TypeScript instead.
 
-## Apps
+## What these apps look like
 
-| App | What it does | Approach |
-|-----|-------------|----------|
-| `search-tool/` | Specimen search with local detail pages | API client + link builder override |
-| `map-explorer/` | Interactive specimen map with collection pills | MapLibre GL + CAS vector tiles |
-| `specimen-viewer/` | Specimen detail with taxonomy, locality, images | API client + custom rendering |
-| `stories-browser/` | Story cards with images and themes | API client + card grid |
-| `lessons-browser/` | Lesson plan cards | API client + card grid |
-| `papers-browser/` | Searchable literature list with DOI links | API client + search input |
+### search-tool — Specimen search with local detail pages
 
-The `search-tool` is the most complete example. It demonstrates the **link builder pattern**: clicking a specimen in the search results navigates to a local detail page within the app, not to `collections.calacademy.org`. This is the pattern for building your own UI on top of CAS data.
+Search across 1.4 million specimens. Click any catalog number to see a detail page that lives within your app, not on the CAS website.
 
-## Running an app
+![Search results for "iris" showing a table of Botany specimens](docs/screenshots/search-results.png)
 
-```bash
-cd search-tool     # or any app directory
-npm install
-npm run dev
+Click a specimen to see your own detail page with taxonomy, collection info, and images:
+
+![Detail page showing an Iris herbarium sheet with taxonomy and locality](docs/screenshots/search-detail.png)
+
+### map-explorer — Interactive map
+
+All specimens plotted on a map using vector tiles. Click collection pills to filter by department.
+
+![World map with collection filter pills](docs/screenshots/map-explorer.png)
+
+### specimen-viewer — Specimen detail
+
+Look up any specimen by UUID and see its full record — taxonomy, collector, locality, coordinates, images, and conservation status.
+
+![Specimen detail page showing Latimeria chalumnae (Coelacanth)](docs/screenshots/specimen-viewer.png)
+
+### stories-browser — Stories and narratives
+
+Browse published stories from CAS — scientific narratives with images, themes, and editorial content.
+
+![Grid of story cards with images and titles](docs/screenshots/stories-browser.png)
+
+### lessons-browser — Lesson plans
+
+Browse educational lesson plans from CAS, filterable by grade level and subject.
+
+![Three lesson plan cards](docs/screenshots/lessons-browser.png)
+
+### papers-browser — Scientific literature
+
+Search and browse 1,300+ scientific papers published by CAS researchers, with DOI links.
+
+![List of papers with titles, authors, years, and journals](docs/screenshots/papers-browser.png)
+
+## Concepts for non-web developers
+
+If you're coming from Python or another language, here's a quick orientation.
+
+### What is React?
+
+React is a JavaScript library for building user interfaces. Instead of generating HTML on a server (like Flask or Django templates), React runs in the browser and builds the page dynamically. You write **components** — functions that return what the UI should look like — and React keeps the screen in sync with your data.
+
+```tsx
+// A React component is just a function that returns markup
+function Greeting({ name }) {
+  return <h1>Hello, {name}</h1>;
+}
 ```
 
-Open the URL shown in the terminal (usually `http://localhost:5173`).
+### What is Vite?
 
-## How it works
+Vite is the development server. It's the equivalent of `python -m http.server` but for React apps — it serves your code to the browser, watches for changes, and reloads automatically. You start it with `npm run dev`.
 
-Each app uses two things from the `@calacademy-research/cas-lens` package:
+### What is an API call?
 
-1. **`CASLensProvider`** — sets up the API connection
-2. **`getApiClient()`** — returns an axios instance pointed at the CAS API
+Same as in Python. The CAS API is a REST service at `collections.calacademy.org/api`. Instead of `requests.get()`, JavaScript uses `axios` or `fetch()`:
 
-The apps call API endpoints directly (`/api/search`, `/api/stories`, `/api/literature`, `/api/specimens/{id}`) and render the results with their own inline-styled components. No Tailwind, no CAS Lens UI components, no framework lock-in.
+```python
+# Python
+response = requests.get('https://collections.calacademy.org/api/search', params={'q': 'iris'})
+data = response.json()
+```
 
-The Vite dev server proxies `/api` and `/tiles` requests to `collections.calacademy.org` to avoid CORS issues during development. See `vite.config.ts` in any app for the proxy setup.
+```tsx
+// JavaScript (what these apps do)
+const client = getApiClient();
+const response = await client.get('/search', { params: { q: 'iris' } });
+const data = response.data;
+```
 
-## Link builder
+### What is a "proxy"?
 
-When you embed CAS data in your own app, you want links to stay within your app — not navigate to `collections.calacademy.org`. The `links` prop on `CASLensProvider` handles this:
+Browsers block requests from `localhost` to `collections.calacademy.org` for security reasons (this is called CORS). The proxy is a workaround: your dev server intercepts requests to `/api` and forwards them to the real server. Your code calls `/api/search` and the dev server turns that into `https://collections.calacademy.org/api/search` behind the scenes. This is configured in `vite.config.ts`.
+
+### What is npm?
+
+npm is the package manager for JavaScript — like `pip` for Python. `npm install` installs dependencies (like `pip install -r requirements.txt`), and `npm run dev` runs the development server.
+
+### What is TypeScript?
+
+TypeScript is JavaScript with type annotations. If you've used Python type hints (`def search(query: str) -> list[Specimen]:`), it's the same idea. The `.tsx` file extension means TypeScript + JSX (the HTML-like syntax React uses).
+
+## How the apps work
+
+Every app follows the same pattern:
+
+1. **Wrap your app in `CASLensProvider`** — this sets up the API connection
+2. **Call `getApiClient()`** — this gives you an HTTP client pointed at the CAS API
+3. **Fetch data and render it** — your code, your layout, your design
+
+```tsx
+import { CASLensProvider, getApiClient } from '@calacademy-research/cas-lens';
+
+export default function App() {
+  return (
+    <CASLensProvider apiBase="/api">
+      <MyComponent />
+    </CASLensProvider>
+  );
+}
+
+function MyComponent() {
+  // getApiClient() returns an HTTP client, like requests.Session() in Python
+  const client = getApiClient();
+  // Now call any CAS API endpoint
+}
+```
+
+The apps don't use any CAS Lens UI components (no drop-in widgets). They call the API directly and render with plain HTML and inline styles. This means you have complete control over the look and feel.
+
+### Link builder
+
+When your app displays CAS data, you want clicks to navigate within your app — not to `collections.calacademy.org`. The `links` prop on `CASLensProvider` controls this:
 
 ```tsx
 <CASLensProvider
   apiBase="/api"
   links={{
-    specimen: (id, collection) => `/my-detail-page/${id}`,
-    story: (slug) => `/my-stories/${slug}`,
+    // When anything in the app generates a specimen link,
+    // use this URL pattern instead of the CAS default
+    specimen: (id, collection) => `/my-page/${id}`,
   }}
 >
 ```
 
-Any component that calls `useLinkBuilder()` will generate URLs using your functions instead of the defaults. See `search-tool/src/App.tsx` for a working example with a local specimen detail page.
+The `search-tool` app demonstrates this end to end: search results link to a local detail page at `/specimen/:id` instead of the CAS website.
 
-## Before the package is published
+## Running an app
 
-These apps currently install `@calacademy-research/cas-lens` as a `file:` dependency pointing at the local `cas-lens/frontend` directory. Once the package is published to GitHub Packages, change the dependency in `package.json` to:
+```bash
+# 1. Clone this repo
+git clone git@github.com:calacademy-research/lens-apps.git
+cd lens-apps
 
-```json
-"@calacademy-research/cas-lens": "^0.1.0"
+# 2. Pick an app and install its dependencies
+cd search-tool
+npm install
+
+# 3. Start the development server
+npm run dev
 ```
 
-And add a `.npmrc` with your GitHub token:
+Open the URL shown in the terminal (usually `http://localhost:5173`).
+
+Each app is independent. They don't share dependencies or state. You can run multiple apps at once on different ports.
+
+## Project structure
 
 ```
-@calacademy-research:registry=https://npm.pkg.github.com
-//npm.pkg.github.com/:_authToken=${GITHUB_TOKEN}
+lens-apps/
+├── search-tool/          ← specimen search + local detail pages
+│   ├── src/App.tsx        ← all the app code (one file)
+│   ├── vite.config.ts     ← dev server config with API proxy
+│   ├── package.json       ← dependencies
+│   └── index.html         ← entry point
+├── map-explorer/         ← interactive vector tile map
+├── specimen-viewer/      ← specimen detail lookup
+├── stories-browser/      ← CAS stories card grid
+├── lessons-browser/      ← lesson plans card grid
+├── papers-browser/       ← searchable literature list
+└── docs/
+    ├── getting-started.md ← build your first app from scratch
+    ├── api-reference.md   ← all exports, endpoints, and types
+    └── screenshots/       ← app screenshots
 ```
 
-## Docs
+Each app is a single `App.tsx` file (80-250 lines) plus boilerplate config files. The `App.tsx` is the only file you need to read to understand what the app does.
 
-- [Getting Started](docs/getting-started.md) — build your first app from scratch
-- [API Reference](docs/api-reference.md) — all exports, hooks, types, and API endpoints
+## Available API endpoints
+
+These are the CAS API endpoints the apps use. All return JSON.
+
+| Endpoint | What it returns | Example app |
+|----------|----------------|-------------|
+| `/api/search?q=iris&per_page=25` | Specimen search results | search-tool |
+| `/api/specimens/{uuid}` | Single specimen record | specimen-viewer, search-tool |
+| `/api/stories?page=1&per_page=12` | Published stories | stories-browser |
+| `/api/stories?content_type=lesson_plan` | Lesson plans | lessons-browser |
+| `/api/literature?page=1&per_page=20&q=coral` | Scientific papers | papers-browser |
+| `/api/collections` | List of all collections | any |
+| `/tiles/{collection}/{z}/{x}/{y}.pbf` | Vector map tiles | map-explorer |
+
+## Further reading
+
+- [Getting Started](docs/getting-started.md) — build your first app from scratch, step by step
+- [API Reference](docs/api-reference.md) — all exports, hooks, types, endpoints, and collection codes
+- [CAS Lens](https://github.com/calacademy-research/cas-lens) — the main CAS Lens project this builds on
