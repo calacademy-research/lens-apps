@@ -16,19 +16,29 @@ These apps take a different approach: **call the live CAS Lens API at query time
 
 ## What you can use
 
-CAS Lens is a large application — specimen search, maps, detail pages, stories, lesson plans, literature, expeditions, collector profiles, and more. This repo shows how to take pieces of that system and use them in your own app, without adopting the whole thing.
+A typical approach would be to publish an API and tell people "here are the endpoints, go build something." That's not enough. An API gives you raw data, but the hard problems are everything that sits between data and a working app: How do you manage search state across multiple views? How do you render 1.4 million specimens on a map without the browser crashing? How do you keep filters, pagination, and URL state in sync? How do you handle debounced collection toggles, or bounding box intersection with antimeridian wrapping?
 
-You can plug in at different levels:
+CAS Lens has already solved these problems. Instead of making every consumer re-solve them, we export the solutions as reusable pieces — not just data endpoints, but working code that handles the complexity.
 
-- **Just the data** — call the API with `getApiClient()`, get JSON back, render it yourself. The `papers-browser` and `stories-browser` apps work this way. You're using CAS Lens as a data source.
+Here's what's available, from simplest to most involved:
 
-- **Data + state management** — use the hooks (`useSearchQuery`, `useSearchFilters`, `useMapState`, `usePaginationState`) to manage search/filter/pagination state. You get the same state logic the main app uses, but render your own UI.
+### Level 1: Data
 
-- **Data + vector tiles** — use the CAS tile server directly with MapLibre GL to render 1.4M+ specimens on a map with GPU-accelerated clustering. The `map-explorer` app does this. You get the same map data as the main app, rendered in your own layout.
+Call the API with `getApiClient()`, get JSON back, render it yourself. The `papers-browser` and `stories-browser` apps work this way. You get the same data as the main CAS Lens app — specimens with resolved taxonomy, IUCN status, collector links, and media — without running your own database or indexing pipeline.
 
-- **Data + link routing** — use the link builder to keep navigation within your app. When a user clicks a specimen, story, or paper, the link points to your page, not `collections.calacademy.org`. The `search-tool` app demonstrates this with a local specimen detail page.
+### Level 2: Data + state management
 
-You choose how much to take. Use one endpoint and build everything else yourself, or use the hooks and state management and just swap the UI. Each example app shows a different point on that spectrum.
+Use the hooks (`useSearchQuery`, `useSearchFilters`, `useMapState`, `usePaginationState`) to manage search, filter, and pagination state. These are the same hooks the main app uses internally. They handle the details — debouncing collection toggles so the API isn't flooded, resetting the page number when filters change, computing an effective query from structured conditions. You get that behavior for free and just render your own UI on top.
+
+### Level 3: Data + vector tiles
+
+Use the CAS tile server directly with MapLibre GL to render 1.4M+ specimens on a map. The tiles are pre-clustered with per-zoom-level cluster distances, meaning the world view shows hundreds of clusters, not 20 mega-blobs. The `map-explorer` app does this in about 200 lines — getting the same map performance as the main app without reimplementing the tiling, clustering, or collection-color logic.
+
+### Level 4: Data + link routing
+
+Use the link builder to keep navigation within your app. When a user clicks a specimen, story, or paper, the link points to your page, not `collections.calacademy.org`. The `search-tool` demonstrates this with a local specimen detail page — one prop on the provider, and every generated link routes through your app.
+
+You choose how much to take. Each example app shows a different point on that spectrum.
 
 If you can write Python, you can read this code — the concepts are the same (fetch data from an API, render it), just in JavaScript/TypeScript instead.
 
