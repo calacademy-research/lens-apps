@@ -2,7 +2,19 @@
 
 Example apps built on top of [CAS Lens](https://github.com/calacademy-research/cas-lens), the California Academy of Sciences collections platform.
 
-## The idea
+## Why this exists
+
+Different teams at CAS need different things from the collections data. The education team might want a lesson plan finder. A researcher might want a specialized map for a single taxon. IT might want a dashboard. Each team could build their tool from scratch — export some data, put it in their own database, write their own search. But that creates problems:
+
+- **Data islands.** Each tool has its own copy of the data, updated on its own schedule (or not at all). A specimen record gets corrected in the main database, but the lesson plan finder still shows the old name. A new paper is published, but the researcher's dashboard doesn't know about it.
+
+- **Duplicated effort.** Every tool reimplements search, pagination, taxonomy lookups, geographic filtering. Bugs get fixed in one place but not the others. Improvements don't propagate.
+
+- **Maintenance burden.** Each tool is a full application with its own data pipeline, its own deployment, its own bugs. When the main database schema changes, everything breaks independently.
+
+These apps take a different approach: **call the live CAS Lens API at query time.** No data copies, no sync jobs, no separate databases. Your app is 80-250 lines of code that fetches current data and renders it your way. When a specimen record is updated, a story is published, or a paper is added, every app that uses the API reflects it immediately.
+
+## What you can use
 
 CAS Lens is a large application — specimen search, maps, detail pages, stories, lesson plans, literature, expeditions, collector profiles, and more. This repo shows how to take pieces of that system and use them in your own app, without adopting the whole thing.
 
@@ -16,7 +28,7 @@ You can plug in at different levels:
 
 - **Data + link routing** — use the link builder to keep navigation within your app. When a user clicks a specimen, story, or paper, the link points to your page, not `collections.calacademy.org`. The `search-tool` app demonstrates this with a local specimen detail page.
 
-The point is that you choose how much to take. Use one endpoint and build everything else yourself, or use the hooks and state management and just swap the UI. Each example app shows a different point on that spectrum.
+You choose how much to take. Use one endpoint and build everything else yourself, or use the hooks and state management and just swap the UI. Each example app shows a different point on that spectrum.
 
 If you can write Python, you can read this code — the concepts are the same (fetch data from an API, render it), just in JavaScript/TypeScript instead.
 
@@ -136,17 +148,7 @@ function MyComponent() {
 }
 ```
 
-### Why this approach matters
-
-These apps don't copy data out of CAS Lens into their own databases. They call the live API at query time. This means:
-
-- **No data islands.** Your app always shows current data. When a specimen record is updated, a new story is published, or a paper is added, your app reflects it immediately — no sync jobs, no stale copies.
-
-- **No duplicated effort.** The search indexing, taxonomy resolution, collector matching, tile generation, and IUCN enrichment all happen once in CAS Lens. Your app gets the results for free.
-
-- **Maintainability.** Your app is 80-250 lines of code that calls a stable API. You don't maintain a data pipeline, a database, or a copy of the CAS Lens codebase. When CAS Lens improves its data or adds features, your app benefits without changes.
-
-The hooks and link builder extend this principle to UI behavior. Instead of reimplementing search state management or filter logic, you import `useSearchQuery()` and get the same battle-tested logic the main app uses. When it's improved, your app gets the improvement.
+The same principle applies to behavior, not just data. Instead of reimplementing search state management or filter logic, you import `useSearchQuery()` and get the same logic the main app uses. When it's improved, your app gets the improvement.
 
 ### Link builder
 
