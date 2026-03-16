@@ -1,12 +1,35 @@
 /**
- * Search Tool — Specimen search with results table.
+ * Search Tool — Specimen search with local detail pages.
  *
- * Uses getApiClient() to call the search API directly and renders
- * results in an inline-styled table. Does not depend on Tailwind CSS.
+ * DEMONSTRATES THE LINK BUILDER PATTERN:
+ *
+ * When you embed CAS Lens modules in your own app, clicking a specimen
+ * in the search results should navigate within YOUR app — not to
+ * collections.calacademy.org. This example shows how:
+ *
+ *   1. Pass a `links` prop to <CASLensProvider> that maps entity types
+ *      to your app's own routes.
+ *
+ *   2. Use useLinkBuilder() in any component to generate those URLs.
+ *
+ *   3. Build your own detail page that fetches data from the CAS API
+ *      via getApiClient() and displays it however you want.
+ *
+ * The key line is:
+ *
+ *   links={{ specimen: (id, col) => `/specimen/${id}` }}
+ *
+ * This tells every CAS Lens component: "when you'd normally link to
+ * a specimen, use this URL pattern instead."
  */
 import { useState, useCallback } from 'react';
+import { BrowserRouter, Routes, Route, useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { CASLensProvider, getApiClient, useLinkBuilder } from '@calacademy-research/cas-lens';
+
+// ---------------------------------------------------------------------------
+// Types — just the fields we care about for this app
+// ---------------------------------------------------------------------------
 
 interface Specimen {
   id: string;
@@ -15,10 +38,18 @@ interface Specimen {
   scientific_name: string | null;
   accepted_name: string | null;
   taxon_family: string | null;
+  taxon_order: string | null;
+  taxon_class: string | null;
   locality: string | null;
   country: string | null;
+  state_province: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  verbatim_collector: string | null;
   year_collected: number | null;
   type_status: string | null;
+  common_name: string | null;
+  media: { url: string; type: string; label?: string }[];
 }
 
 interface SearchResponse {
@@ -29,8 +60,117 @@ interface SearchResponse {
   total_pages: number;
 }
 
-function SearchInner() {
+// ---------------------------------------------------------------------------
+// LOCAL DETAIL PAGE
+//
+// This is YOUR page — not a CAS Lens component. It fetches a single
+// specimen from the API and renders it in whatever format you want.
+// This is what consumers build on top of the CAS data.
+// ---------------------------------------------------------------------------
+
+function SpecimenPage() {
+  // Read the specimen ID from the URL (set up by React Router below)
+  const { id } = useParams<{ id: string }>();
+
+  // Fetch the specimen from the CAS API using the shared client
+  const { data: s, isLoading, error } = useQuery<Specimen>({
+    queryKey: ['specimen', id],
+    queryFn: async () => {
+      const client = getApiClient();
+      const res = await client.get(`/specimens/${id}`);
+      return res.data;
+    },
+    enabled: !!id,
+  });
+
+  if (isLoading) return <Page><p style={{ color: '#666' }}>Loading specimen...</p></Page>;
+  if (error) return <Page><p style={{ color: '#c00' }}>Failed to load: {(error as Error).message}</p></Page>;
+  if (!s) return <Page><p>Specimen not found</p></Page>;
+
+  // Pick the first image if available
+  const image = s.media?.find(m => m.type === 'image');
+
+  // Render the specimen in OUR format — not the CAS Lens format.
+  // This is the whole point: you control the presentation.
+  return (
+    <Page>
+      {/* Back link to search results */}
+      <Link to="/" style={{ color: '#003262', fontSize: '14px', textDecoration: 'none' }}>
+        &larr; Back to search
+      </Link>
+
+      {/* Two-column layout: info + image */}
+      <div style={{ display: 'flex', gap: '32px', marginTop: '16px', flexWrap: 'wrap' }}>
+
+        {/* Left column: our custom card format */}
+        <div style={{ flex: '1 1 400px' }}>
+          {/* Big species name */}
+          <h1 style={{ margin: '0 0 4px', fontSize: '28px', color: '#003262' }}>
+            <em>{s.scientific_name || 'Unknown species'}</em>
+          </h1>
+
+          {/* Common name if available */}
+          {s.common_name && (
+            <p style={{ margin: '0 0 12px', fontSize: '16px', color: '#666' }}>{s.common_name}</p>
+          )}
+
+          {/* Badges */}
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', flexWrap: 'wrap' }}>
+            <Badge color="#003262">{s.collection_code.toUpperCase()} {s.catalog_number}</Badge>
+            {s.type_status && <Badge color="#92400e">{s.type_status}</Badge>}
+            {s.year_collected && <Badge color="#065f46">Collected {s.year_collected}</Badge>}
+          </div>
+
+          {/* Key facts as a simple list — our custom layout */}
+          <FactRow label="Family" value={s.taxon_family} />
+          <FactRow label="Order" value={s.taxon_order} />
+          <FactRow label="Class" value={s.taxon_class} />
+          <FactRow label="Collector" value={s.verbatim_collector} />
+          <FactRow label="Locality" value={s.locality} />
+          <FactRow label="Country" value={[s.state_province, s.country].filter(Boolean).join(', ')} />
+          {s.latitude != null && (
+            <FactRow label="Coordinates" value={`${s.latitude.toFixed(4)}, ${s.longitude?.toFixed(4)}`} />
+          )}
+        </div>
+
+        {/* Right column: image */}
+        <div style={{ flex: '0 0 280px' }}>
+          {image ? (
+            <img
+              src={image.url}
+              alt={s.scientific_name || 'Specimen'}
+              style={{ width: '100%', borderRadius: '8px', border: '1px solid #e0e0e0' }}
+              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+            />
+          ) : (
+            <div style={{
+              width: '100%', height: '200px', borderRadius: '8px',
+              border: '2px dashed #ddd', display: 'flex', alignItems: 'center',
+              justifyContent: 'center', color: '#ccc',
+            }}>
+              No image
+            </div>
+          )}
+        </div>
+      </div>
+    </Page>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// SEARCH PAGE
+//
+// Uses useLinkBuilder() to generate specimen links. Because we passed
+// `links={{ specimen: ... }}` to CASLensProvider, the links point to
+// our local /specimen/:id route instead of collections.calacademy.org.
+// ---------------------------------------------------------------------------
+
+function SearchPage() {
+  // useLinkBuilder() returns the link functions we configured on the provider.
+  // When we call links.specimen(id, collection), it returns "/specimen/{id}"
+  // instead of the default "https://collections.calacademy.org/..." URL.
   const links = useLinkBuilder();
+
   const [query, setQuery] = useState('');
   const [submittedQuery, setSubmittedQuery] = useState('');
   const [collection, setCollection] = useState<string | null>(null);
@@ -46,11 +186,7 @@ function SearchInner() {
     queryKey: ['search', submittedQuery, collection, hasImages, page, sortBy],
     queryFn: async () => {
       const client = getApiClient();
-      const params: Record<string, any> = {
-        q: submittedQuery,
-        page,
-        per_page: perPage,
-      };
+      const params: Record<string, any> = { q: submittedQuery, page, per_page: perPage };
       if (collection) params.collection = collection;
       if (hasImages) params.has_images = true;
       if (sortBy) params.sort_by = sortBy;
@@ -78,42 +214,36 @@ function SearchInner() {
 
   const totalPages = data ? Math.ceil(data.total / perPage) : 0;
 
-  const thStyle = {
-    padding: '8px 12px', textAlign: 'left' as const, borderBottom: '2px solid #e0e0e0',
+  const thStyle: React.CSSProperties = {
+    padding: '8px 12px', textAlign: 'left', borderBottom: '2px solid #e0e0e0',
     fontSize: '13px', fontWeight: 600, color: '#003262', cursor: 'pointer',
-    whiteSpace: 'nowrap' as const, background: '#f8f9fa',
+    whiteSpace: 'nowrap', background: '#f8f9fa',
   };
-  const tdStyle = {
-    padding: '6px 12px', borderBottom: '1px solid #eee', fontSize: '13px', verticalAlign: 'top' as const,
+  const tdStyle: React.CSSProperties = {
+    padding: '6px 12px', borderBottom: '1px solid #eee', fontSize: '13px', verticalAlign: 'top',
   };
 
   return (
-    <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '20px', fontFamily: 'system-ui' }}>
+    <Page>
       <h1 style={{ color: '#003262', marginBottom: '4px' }}>CAS Specimen Search</h1>
       <p style={{ color: '#666', marginTop: 0 }}>
-        Search across 1.4 million specimens from the California Academy of Sciences
+        Search across 1.4 million specimens — click any catalog number to see our local detail page
       </p>
 
       <form onSubmit={handleSearch} style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
         <input
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          type="text" value={query} onChange={(e) => setQuery(e.target.value)}
           placeholder="Scientific name, locality, collector..."
           style={{ padding: '8px 14px', borderRadius: '6px', border: '1px solid #ccc', flex: 1, minWidth: '250px', fontSize: '15px' }}
         />
-        <select
-          value={collection ?? ''}
-          onChange={(e) => { setCollection(e.target.value || null); setPage(1); }}
-          style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid #ccc' }}
-        >
+        <select value={collection ?? ''} onChange={(e) => { setCollection(e.target.value || null); setPage(1); }}
+          style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid #ccc' }}>
           <option value="">All Collections</option>
           <option value="ich">Ichthyology</option>
           <option value="herp">Herpetology</option>
           <option value="orn">Ornithology</option>
-          <option value="mam">Mammalogy</option>
-          <option value="ent">Entomology</option>
           <option value="botany">Botany</option>
+          <option value="ent">Entomology</option>
           <option value="iz">Invertebrate Zoology</option>
         </select>
         <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '14px' }}>
@@ -161,16 +291,23 @@ function SearchInner() {
                 </thead>
                 <tbody>
                   {data.results.map((s) => (
-                    <tr key={s.id} style={{ cursor: 'pointer' }}
+                    <tr key={s.id}
                       onMouseEnter={(e) => (e.currentTarget.style.background = '#f0f4ff')}
-                      onMouseLeave={(e) => (e.currentTarget.style.background = 'white')}
-                    >
+                      onMouseLeave={(e) => (e.currentTarget.style.background = 'white')}>
                       <td style={tdStyle}>
-                        <a href={links.specimen(s.id, s.collection_code)}
-                          target="_blank" rel="noopener noreferrer"
+                        {/*
+                         * THIS IS THE KEY LINE:
+                         * links.specimen() returns "/specimen/{id}" because we
+                         * configured it in the CASLensProvider below. Without
+                         * the override, it would return a collections.calacademy.org URL.
+                         *
+                         * We use a React Router <Link> so clicking navigates
+                         * within our app instead of opening a new tab.
+                         */}
+                        <Link to={links.specimen(s.id, s.collection_code)}
                           style={{ color: '#003262', textDecoration: 'none', fontWeight: 500 }}>
                           {s.catalog_number}
-                        </a>
+                        </Link>
                       </td>
                       <td style={tdStyle}>{s.collection_code?.toUpperCase()}</td>
                       <td style={{ ...tdStyle, fontStyle: 'italic' }}>{s.scientific_name || '—'}</td>
@@ -215,16 +352,81 @@ function SearchInner() {
           Enter a search term to find specimens. Try "Iris", "Galapagos", or "Holotype".
         </div>
       )}
+    </Page>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// HELPER COMPONENTS — tiny reusable bits for the detail page
+// ---------------------------------------------------------------------------
+
+/** Page wrapper — centers content with consistent padding */
+function Page({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '20px', fontFamily: 'system-ui' }}>
+      {children}
     </div>
   );
 }
 
+/** A colored pill badge */
+function Badge({ color, children }: { color: string; children: React.ReactNode }) {
+  return (
+    <span style={{
+      display: 'inline-block', padding: '2px 10px', borderRadius: '12px',
+      fontSize: '12px', fontWeight: 600, color: 'white', background: color,
+    }}>
+      {children}
+    </span>
+  );
+}
+
+/** A label: value row for the detail page */
+function FactRow({ label, value }: { label: string; value: string | null | undefined }) {
+  if (!value) return null;
+  return (
+    <div style={{ padding: '6px 0', borderBottom: '1px solid #f0f0f0', display: 'flex', gap: '12px' }}>
+      <span style={{ fontWeight: 600, color: '#003262', fontSize: '13px', minWidth: '100px' }}>{label}</span>
+      <span style={{ fontSize: '14px', color: '#333' }}>{value}</span>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// APP ROOT
+//
+// The `links` prop is where the magic happens. It tells every CAS Lens
+// component in this tree: "specimen links should go to /specimen/:id".
+//
+// Without this prop, links.specimen() would return the default:
+//   https://collections.calacademy.org/{collection}/specimen/{id}
+//
+// With this prop, it returns:
+//   /specimen/{id}
+//
+// That's it — one prop, and all specimen links in the app are local.
+// ---------------------------------------------------------------------------
+
 export default function App() {
   return (
-    // To override links in your own app, pass a `links` prop:
-    // <CASLensProvider apiBase="/api" links={{ specimen: (id, col) => `/specimen/${col}/${id}` }}>
-    <CASLensProvider apiBase="/api">
-      <SearchInner />
-    </CASLensProvider>
+    <BrowserRouter>
+      <CASLensProvider
+        apiBase="/api"
+        links={{
+          // Override specimen links to point to our local detail page.
+          // The (id, _collection) args match the LinkBuilder.specimen signature.
+          // We ignore collection here since our route only needs the UUID.
+          specimen: (id, _collection) => `/specimen/${id}`,
+        }}
+      >
+        <Routes>
+          {/* Search results — the table uses links.specimen() for each row */}
+          <Route path="/" element={<SearchPage />} />
+
+          {/* Our local detail page — fetches from the API and renders our way */}
+          <Route path="/specimen/:id" element={<SpecimenPage />} />
+        </Routes>
+      </CASLensProvider>
+    </BrowserRouter>
   );
 }
