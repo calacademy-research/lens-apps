@@ -1,8 +1,24 @@
 # Lens Apps
 
-Example apps that use data from the California Academy of Sciences specimen database. Each one is a small, self-contained web app that pulls data from the CAS API and displays it in its own way.
+Example apps built on top of [CAS Lens](https://github.com/calacademy-research/cas-lens), the California Academy of Sciences collections platform.
 
-These apps exist to show how you can build your own tools on top of CAS collections data. If you can write Python, you can read this code — the concepts are the same (fetch data from an API, render it), just in JavaScript/TypeScript instead.
+## The idea
+
+CAS Lens is a large application — specimen search, maps, detail pages, stories, lesson plans, literature, expeditions, collector profiles, and more. This repo shows how to take pieces of that system and use them in your own app, without adopting the whole thing.
+
+You can plug in at different levels:
+
+- **Just the data** — call the API with `getApiClient()`, get JSON back, render it yourself. The `papers-browser` and `stories-browser` apps work this way. You're using CAS Lens as a data source.
+
+- **Data + state management** — use the hooks (`useSearchQuery`, `useSearchFilters`, `useMapState`, `usePaginationState`) to manage search/filter/pagination state. You get the same state logic the main app uses, but render your own UI.
+
+- **Data + vector tiles** — use the CAS tile server directly with MapLibre GL to render 1.4M+ specimens on a map with GPU-accelerated clustering. The `map-explorer` app does this. You get the same map data as the main app, rendered in your own layout.
+
+- **Data + link routing** — use the link builder to keep navigation within your app. When a user clicks a specimen, story, or paper, the link points to your page, not `collections.calacademy.org`. The `search-tool` app demonstrates this with a local specimen detail page.
+
+The point is that you choose how much to take. Use one endpoint and build everything else yourself, or use the hooks and state management and just swap the UI. Each example app shows a different point on that spectrum.
+
+If you can write Python, you can read this code — the concepts are the same (fetch data from an API, render it), just in JavaScript/TypeScript instead.
 
 ## What these apps look like
 
@@ -99,8 +115,8 @@ TypeScript is JavaScript with type annotations. If you've used Python type hints
 Every app follows the same pattern:
 
 1. **Wrap your app in `CASLensProvider`** — this sets up the API connection
-2. **Call `getApiClient()`** — this gives you an HTTP client pointed at the CAS API
-3. **Fetch data and render it** — your code, your layout, your design
+2. **Pull in what you need** — data via `getApiClient()`, state via hooks, tiles via URL
+3. **Render it your way** — your code, your layout, your design
 
 ```tsx
 import { CASLensProvider, getApiClient } from '@calacademy-research/cas-lens';
@@ -120,7 +136,17 @@ function MyComponent() {
 }
 ```
 
-The apps don't use any CAS Lens UI components (no drop-in widgets). They call the API directly and render with plain HTML and inline styles. This means you have complete control over the look and feel.
+### Why this approach matters
+
+These apps don't copy data out of CAS Lens into their own databases. They call the live API at query time. This means:
+
+- **No data islands.** Your app always shows current data. When a specimen record is updated, a new story is published, or a paper is added, your app reflects it immediately — no sync jobs, no stale copies.
+
+- **No duplicated effort.** The search indexing, taxonomy resolution, collector matching, tile generation, and IUCN enrichment all happen once in CAS Lens. Your app gets the results for free.
+
+- **Maintainability.** Your app is 80-250 lines of code that calls a stable API. You don't maintain a data pipeline, a database, or a copy of the CAS Lens codebase. When CAS Lens improves its data or adds features, your app benefits without changes.
+
+The hooks and link builder extend this principle to UI behavior. Instead of reimplementing search state management or filter logic, you import `useSearchQuery()` and get the same battle-tested logic the main app uses. When it's improved, your app gets the improvement.
 
 ### Link builder
 
