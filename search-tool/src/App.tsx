@@ -7,7 +7,7 @@
  */
 import { useState } from 'react';
 import { CASLensProvider, SpecimenSearch } from '@calacademy-research/cas-lens';
-import '@calacademy-research/cas-lens/styles';
+// No CSS import needed — SpecimenSearch uses inline styles
 
 const API_BASE = 'https://collections.calacademy.org/api';
 

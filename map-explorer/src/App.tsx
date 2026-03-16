@@ -7,7 +7,7 @@
  */
 import { useState } from 'react';
 import { CASLensProvider, SpecimenMap } from '@calacademy-research/cas-lens';
-import '@calacademy-research/cas-lens/styles';
+import 'maplibre-gl/dist/maplibre-gl.css';
 
 const API_BASE = 'https://collections.calacademy.org/api';
 

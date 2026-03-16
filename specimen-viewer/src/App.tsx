@@ -10,7 +10,7 @@
  */
 import { useState } from 'react';
 import { CASLensProvider, SpecimenDetailView } from '@calacademy-research/cas-lens';
-import '@calacademy-research/cas-lens/styles';
+import 'leaflet/dist/leaflet.css';
 
 const API_BASE = 'https://collections.calacademy.org/api';
 
